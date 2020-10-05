@@ -1,0 +1,18 @@
+[package]
+name = "sqlcrypto"
+version = "0.1.0"
+authors = ["PizzaCrust <pizzacrustcoder@gmail.com>"]
+edition = "2018"
+
+# See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
+
+[lib]
+name = "sqlcrypto"
+path = "src/lib.rs"
+
+[[bin]]
+name = "sqlcrypto"
+path = "src/main.rs"
+
+[dependencies]
+rust-crypto = "0.2.36"
