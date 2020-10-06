@@ -6,7 +6,6 @@ pub use decrypt::*;
 
 #[cfg(test)]
 mod tests {
-    use crate::decrypt::decrypt;
 
     #[test]
     fn it_works() {
