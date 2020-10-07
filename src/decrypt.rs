@@ -97,7 +97,7 @@ fn try_get_reserve_size_for_specified_page_size(bytes: &[u8], key: &[u8], salt: 
     if reserve >= iv {
         let page_content = decrypt_by_reserve_size(first_page_content, key, iv, reserve)?;
         if is_valid_decrypted_header(page_content.as_slice()) {
-            let mut with_salt = Vec::with_capacity(16 + page_content.len());
+            let mut with_salt = Vec::with_capacity(salt + page_content.len());
             with_salt.extend_from_slice(&bytes[..salt]);
             with_salt.extend(page_content);
             if page == get_page_size_from_database_header(with_salt.as_slice())? && reserve == get_reserved_size_from_database_header(with_salt.as_slice()) {
@@ -108,7 +108,7 @@ fn try_get_reserve_size_for_specified_page_size(bytes: &[u8], key: &[u8], salt: 
     for other_reserve in iv..page - 480 {
         let page_content = decrypt_by_reserve_size(first_page_content, key, iv, other_reserve)?;
         if is_valid_decrypted_header(page_content.as_slice()) {
-            let mut with_salt = Vec::with_capacity(16 + page_content.len());
+            let mut with_salt = Vec::with_capacity(salt + page_content.len());
             with_salt.extend_from_slice(&bytes[..salt]);
             with_salt.extend(page_content);
             if page == get_page_size_from_database_header(with_salt.as_slice())? && other_reserve == get_reserved_size_from_database_header(with_salt.as_slice()) {
