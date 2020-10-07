@@ -16,4 +16,3 @@ path = "src/main.rs"
 
 [dependencies]
 rust-crypto = "0.2.36"
-base64 = "0.13.0"
