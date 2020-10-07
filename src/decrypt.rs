@@ -8,17 +8,29 @@ use crypto::aes::KeySize::KeySize256;
 use crypto::blockmodes::NoPadding;
 use crypto::buffer::{RefReadBuffer, RefWriteBuffer};
 use std::convert::TryInto;
-use crypto::mac::Mac;
+use crypto::mac::{Mac, MacResult};
 
-pub fn decrypt<W: Write>(bytes: &[u8], key: &[u8], output: &mut W) -> Result<()> {
-    output.write(b"SQLite format 3\0")?; // lol
-    let salt = &bytes[..16];
+pub(crate) fn key_derive(salt: &[u8], key: &[u8]) -> (Vec<u8>, Vec<u8>) {
     let mut mac = Hmac::new(Sha1::new(), key);
     let mut key = vec![0u8; 32];
     pbkdf2(&mut mac, &salt[..], 64000, &mut key[..]);
     let hmac_salt: Vec<u8> = salt.iter().map(|x| x ^ (0x3a)).collect();
     let mut hmac_key = vec![0u8; 32];
     pbkdf2(&mut Hmac::new(Sha1::new(), &key[..]), hmac_salt.as_slice(), 2, &mut hmac_key[..]);
+    (key, hmac_key)
+}
+
+pub(crate) fn generate_hmac(hmac_key: &[u8], mut content: Vec<u8>, page_num: usize) -> Result<MacResult> {
+    let mut hmac = Hmac::new(Sha1::new(), hmac_key);
+    content.write(&((page_num + 1) as i32).to_le_bytes())?;
+    hmac.input(content.as_slice());
+    Ok(hmac.result())
+}
+
+pub fn decrypt<W: Write>(bytes: &[u8], key: &[u8], output: &mut W) -> Result<()> {
+    output.write(b"SQLite format 3\0")?; // lol
+    let salt = &bytes[..16];
+    let (key, hmac_key) = key_derive(salt, key);
     let mut page: usize = 1024;
     let mut reserve: usize = 48;
     reserve = decrypt_page_header(bytes, key.as_slice(), 16, &mut page, 16, reserve)?;
@@ -31,11 +43,8 @@ pub fn decrypt<W: Write>(bytes: &[u8], key: &[u8], output: &mut W) -> Result<()>
         let reserve = &page[page.len()-reserve..];
         let iv = &reserve[..16];
         let hmac_old = &reserve[16..16+20];
-        let mut hmac_new = Hmac::new(Sha1::new(), &hmac_key[..]);
-        let mut hmac_data: Vec<u8> = page_content.iter().cloned().chain(iv.iter().cloned()).collect();
-        hmac_data.write(&((i + 1) as i32).to_le_bytes())?;
-        hmac_new.input(hmac_data.as_slice());
-        if hmac_old != hmac_new.result().code() {
+        let hmac_data: Vec<u8> = page_content.iter().cloned().chain(iv.iter().cloned()).collect();
+        if hmac_old != generate_hmac(&hmac_key[..], hmac_data, i)?.code() {
             return Err(Error::Message("hmac check failed in page"))
         }
         let mut page_decrypted = vec![1u8; page_content.len() + reserve.len()];
@@ -48,8 +57,13 @@ pub fn decrypt<W: Write>(bytes: &[u8], key: &[u8], output: &mut W) -> Result<()>
     Ok(())
 }
 
+#[inline]
+pub(crate) fn is_valid_page_size(page: usize) -> bool {
+    page >= 512 && page == 2i32.pow((page as f32).log(2f32).floor() as u32) as usize
+}
+
 fn decrypt_page_header(bytes: &[u8], key: &[u8], salt: usize, page: &mut usize, iv: usize, reserve: usize) -> Result<usize> {
-    if !(*page >= 512 && *page == 2i32.pow((*page as f32).log(2f32).floor() as u32) as usize) {
+    if !(is_valid_page_size(*page)) {
         *page = 512;
     }
     let new_reserve = try_get_reserve_size_for_specified_page_size(bytes, key, salt, *page, iv, reserve)?;
@@ -68,17 +82,17 @@ fn decrypt_page_header(bytes: &[u8], key: &[u8], salt: usize, page: &mut usize, 
 }
 
 #[inline]
-fn get_page(bytes: &[u8], page: usize, page_number: usize) -> &[u8] {
+pub(crate) fn get_page(bytes: &[u8], page: usize, page_number: usize) -> &[u8] {
     &bytes[page*(page_number-1)..page*page_number]
 }
 
 #[inline]
-fn is_valid_decrypted_header(header: &[u8]) -> bool {
+pub(crate) fn is_valid_decrypted_header(header: &[u8]) -> bool {
     header[5] == 64 && header[6] == 32 && header[7] == 32
 }
 
 #[inline]
-fn get_page_size_from_database_header(header: &[u8]) -> Result<usize> {
+pub(crate) fn get_page_size_from_database_header(header: &[u8]) -> Result<usize> {
     let page_sz = u16::from_be_bytes(header[16..18].try_into().unwrap());
     Ok(if page_sz == 1 {
         65536 as usize
@@ -88,7 +102,7 @@ fn get_page_size_from_database_header(header: &[u8]) -> Result<usize> {
 }
 
 #[inline]
-fn get_reserved_size_from_database_header(header: &[u8]) -> usize {
+pub(crate) fn get_reserved_size_from_database_header(header: &[u8]) -> usize {
     header[20] as usize
 }
 

@@ -1,9 +1,11 @@
 #![feature(test)]
 mod decrypt;
 mod error;
+mod encrypt;
 
 pub use error::*;
 pub use decrypt::*;
+pub use encrypt::*;
 
 #[cfg(test)]
 mod tests {
