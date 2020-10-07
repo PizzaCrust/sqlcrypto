@@ -21,6 +21,7 @@ fn read_db_header(header: &[u8]) -> Result<(usize, usize)> {
     Ok((page, reserve))
 }
 
+/// this is not secure! do not use in scenarios that the security of this method is tested!
 pub fn encrypt<W: Write>(bytes: &[u8], key: &[u8], output: &mut W) -> Result<()> {
     let (page, reserve) = read_db_header(&bytes[..100])?;
     let (key, hmac_key) = key_derive(&[1u8; 16], key); // not particularly secure salt
