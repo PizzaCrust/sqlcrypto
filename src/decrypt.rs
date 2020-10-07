@@ -11,29 +11,29 @@ use std::convert::TryInto;
 use crypto::mac::Mac;
 
 pub fn decrypt<W: Write>(bytes: &[u8], key: &[u8], output: &mut W) -> Result<()> {
-    output.write(b"SQLite Format 3\0")?;
+    output.write(b"SQLite format 3\0")?; // lol
     let salt = &bytes[..16];
     let mut mac = Hmac::new(Sha1::new(), key);
     let mut key = vec![0u8; 32];
     pbkdf2(&mut mac, &salt[..], 64000, &mut key[..]);
-    let hmac_salt: Vec<u8> = salt.iter().map(|x| x.pow(0x3a)).collect();
+    let hmac_salt: Vec<u8> = salt.iter().map(|x| x ^ (0x3a)).collect();
     let mut hmac_key = vec![0u8; 32];
     pbkdf2(&mut Hmac::new(Sha1::new(), &key[..]), hmac_salt.as_slice(), 2, &mut hmac_key[..]);
     let mut page: usize = 1024;
     let mut reserve: usize = 48;
-    decrypt_page_header(bytes, key.as_slice(), 16, &mut page, 16, &mut reserve)?;
+    reserve = decrypt_page_header(bytes, key.as_slice(), 16, &mut page, 16, reserve)?;
     for i in 0..bytes.len()/1024 {
         let mut page = get_page(bytes, page, i + 1);
         if i == 0 {
             page = &page[16..];
         }
         let page_content = &page[..page.len()-reserve];
-        let reserve = &page_content[page.len()-reserve..];
+        let reserve = &page[page.len()-reserve..];
         let iv = &reserve[..16];
         let hmac_old = &reserve[16..16+20];
-        let mut hmac_new = Hmac::new(Sha1::new(), &key[..]);
+        let mut hmac_new = Hmac::new(Sha1::new(), &hmac_key[..]);
         let mut hmac_data: Vec<u8> = page_content.iter().cloned().chain(iv.iter().cloned()).collect();
-        hmac_data.write(&(i + 1).to_le_bytes())?;
+        hmac_data.write(&((i + 1) as i32).to_le_bytes())?;
         hmac_new.input(hmac_data.as_slice());
         if hmac_old != hmac_new.result().code() {
             return Err(Error::Message("hmac check failed in page"))
@@ -42,25 +42,25 @@ pub fn decrypt<W: Write>(bytes: &[u8], key: &[u8], output: &mut W) -> Result<()>
         cbc_decryptor(KeySize256, &key[..], iv, NoPadding)
             .decrypt(&mut RefReadBuffer::new(page_content),
                      &mut RefWriteBuffer::new(page_decrypted.as_mut_slice()),
-                     false)?;
+                     true)?; //fml btw
         output.write(&page_decrypted[..])?;
     }
     Ok(())
 }
 
-fn decrypt_page_header(bytes: &[u8], key: &[u8], salt: usize, page: &mut usize, iv: usize, reserve: &mut usize) -> Result<()> {
-    if *page >= 512 && *page == 2i32.pow((*page as f32).log(2f32).floor() as u32) as usize {
+fn decrypt_page_header(bytes: &[u8], key: &[u8], salt: usize, page: &mut usize, iv: usize, reserve: usize) -> Result<usize> {
+    if !(*page >= 512 && *page == 2i32.pow((*page as f32).log(2f32).floor() as u32) as usize) {
         *page = 512;
     }
-    try_get_reserve_size_for_specified_page_size(bytes, key, salt, *page, iv, reserve)?;
-    if *reserve > 0 {
-        return Ok(())
+    let new_reserve = try_get_reserve_size_for_specified_page_size(bytes, key, salt, *page, iv, reserve)?;
+    if new_reserve > 0 {
+        return Ok(new_reserve as usize)
     }
     *page = 512;
     while *page <= 65536 {
-        try_get_reserve_size_for_specified_page_size(bytes, key, salt, *page, iv, reserve)?;
-        if *reserve > 0 {
-            return Ok(())
+        let new_reserve = try_get_reserve_size_for_specified_page_size(bytes, key, salt, *page, iv, reserve)?;
+        if new_reserve > 0 {
+            return Ok(new_reserve as usize)
         }
         *page <<= 1;
     }
@@ -92,16 +92,16 @@ fn get_reserved_size_from_database_header(header: &[u8]) -> usize {
     header[20] as usize
 }
 
-fn try_get_reserve_size_for_specified_page_size(bytes: &[u8], key: &[u8], salt: usize, page: usize, iv: usize, reserve: &mut usize) -> Result<()> {
+fn try_get_reserve_size_for_specified_page_size(bytes: &[u8], key: &[u8], salt: usize, page: usize, iv: usize, reserve: usize) -> Result<isize> {
     let first_page_content = &get_page(bytes, page, 1)[salt..];
-    if *reserve >= iv {
-        let page_content = decrypt_by_reserve_size(first_page_content, key, iv, *reserve)?;
+    if reserve >= iv {
+        let page_content = decrypt_by_reserve_size(first_page_content, key, iv, reserve)?;
         if is_valid_decrypted_header(page_content.as_slice()) {
             let mut with_salt = Vec::with_capacity(16 + page_content.len());
             with_salt.extend_from_slice(&bytes[..salt]);
             with_salt.extend(page_content);
-            if page == get_page_size_from_database_header(with_salt.as_slice())? && *reserve == get_reserved_size_from_database_header(with_salt.as_slice()) {
-                return Ok(())
+            if page == get_page_size_from_database_header(with_salt.as_slice())? && reserve == get_reserved_size_from_database_header(with_salt.as_slice()) {
+                return Ok(reserve as isize)
             }
         }
     }
@@ -112,12 +112,11 @@ fn try_get_reserve_size_for_specified_page_size(bytes: &[u8], key: &[u8], salt: 
             with_salt.extend_from_slice(&bytes[..salt]);
             with_salt.extend(page_content);
             if page == get_page_size_from_database_header(with_salt.as_slice())? && other_reserve == get_reserved_size_from_database_header(with_salt.as_slice()) {
-                *reserve = other_reserve;
-                return Ok(())
+                return Ok(other_reserve as isize)
             }
         }
     }
-    Err(Error::Message("Could not find reserve size"))
+    Ok(-1)
 }
 
 fn decrypt_by_reserve_size(first_page_without_salt: &[u8], key: &[u8], iv: usize, reserve: usize) -> Result<Vec<u8>> {
