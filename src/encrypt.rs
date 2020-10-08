@@ -2,8 +2,6 @@ use crate::*;
 use crate::is_valid_decrypted_header;
 use std::io::Write;
 use ring::hmac::{Key, HMAC_SHA1_FOR_LEGACY_USE_ONLY, sign};
-use aes_frast::aes_core::setkey_enc_k256;
-use aes_frast::aes_with_operation_mode::cbc_enc;
 
 fn read_db_header(header: &[u8]) -> Result<(usize, usize)> {
     if !(&header[..16] == b"SQLite format 3\0" && is_valid_decrypted_header(&header[16..])) {
