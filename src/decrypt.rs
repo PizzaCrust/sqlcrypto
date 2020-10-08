@@ -34,7 +34,7 @@ pub fn decrypt<W: Write>(bytes: &[u8], key: &[u8], output: &mut W) -> Result<()>
     let mut page: usize = 1024;
     let mut reserve: usize = 48;
     reserve = decrypt_page_header(bytes, key.as_slice(), 16, &mut page, 16, reserve)?;
-    for i in 0..bytes.len()/1024 {
+    for i in 0..bytes.len()/page {
         let mut page = get_page(bytes, page, i + 1);
         if i == 0 {
             page = &page[16..];
