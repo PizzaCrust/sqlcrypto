@@ -21,7 +21,7 @@ pub(crate) fn key_derive(salt: &[u8], key: &[u8], hmac: bool) -> (Vec<u8>, Vec<u
 }
 
 /// Decrypts an encrypted SQLite database, provided a key. It will decrypt in place.
-pub fn decrypt(data: &mut Vec<u8>, key: &[u8]) -> Result<()> {
+pub fn decrypt(data: &mut [u8], key: &[u8]) -> Result<()> {
     let salt = &data[..16];
     let (key, _) = key_derive(salt, key, false);
     let mut page: usize = 1024;
