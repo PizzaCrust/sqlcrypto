@@ -39,10 +39,11 @@ pub fn encrypt<R: AsRef<[u8]>, W: Write>(data: R, key: &[u8], output: &mut W) ->
                      &mut RefWriteBuffer::new(page_encrypted.as_mut_slice()),
                      true)?;
         let hmac_data: Vec<u8> = page_encrypted.iter().cloned().chain([1u8; 16].iter().cloned()).collect();
-        let hmac = generate_hmac(&hmac_key[..], hmac_data, i)?;
+        //let hmac = verify_hmac(&hmac_key[..], hmac_data, i)?;
+        // TODO SIGN HMAC
         output.write(page_encrypted.as_slice())?;
         output.write(&[1u8; 16])?;
-        output.write(hmac.code())?;
+        //output.write(hmac.code())?;
         output.write(vec![1u8; reserve - 36].as_slice())?;
     }
     Ok(())

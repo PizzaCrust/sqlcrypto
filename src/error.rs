@@ -22,4 +22,5 @@ macro_rules! create_error {
 create_error! {
     std::io::Error => Io
     crypto::symmetriccipher::SymmetricCipherError => Cipher
+    ring::error::Unspecified => RingUnspecified
 }
