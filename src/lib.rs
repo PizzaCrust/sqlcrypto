@@ -1,3 +1,5 @@
+//! SQLCrypto is a port of [pysqlsimplecipher](https://github.com/bssthu/pysqlsimplecipher) for Rust, which is a utility to decrypt and encrypt SQLite databases.
+#![deny(missing_docs)]
 #![feature(test)]
 mod decrypt;
 mod error;

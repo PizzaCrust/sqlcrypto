@@ -20,7 +20,7 @@ fn read_db_header(header: &[u8]) -> Result<(usize, usize)> {
     Ok((page, reserve))
 }
 
-/// this is not secure! do not use in scenarios that the security of this method is tested!
+/// Encrypts a decrypted SQLite database, provided a key and an output stream. THIS IS NOT SECURE!
 pub fn encrypt<R: AsRef<[u8]>, W: Write>(data: R, key: &[u8], output: &mut W) -> Result<()> {
     let bytes = data.as_ref();
     let (page, reserve) = read_db_header(&bytes[..100])?;

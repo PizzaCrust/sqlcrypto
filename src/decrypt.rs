@@ -28,6 +28,7 @@ pub(crate) fn verify_hmac(hmac_key: &Key, mut content: Vec<u8>, page_num: usize,
     Ok(())
 }
 
+/// Decrypts an encrypted SQLite database, provided a key and an output stream.
 pub fn decrypt<R: AsRef<[u8]>, W: Write>(data: R, key: &[u8], output: &mut W) -> Result<()> {
     let bytes = data.as_ref();
     output.write(b"SQLite format 3\0")?; // lol
