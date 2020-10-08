@@ -1,8 +1,11 @@
 [package]
 name = "sqlcrypto"
+description = "lightweight and memory efficient sqlite/sqlcipher encryption (not secure)/decryption in pure rust"
+license = "MIT"
 version = "0.0.1"
 authors = ["PizzaCrust <pizzacrustcoder@gmail.com>"]
 edition = "2018"
+repository = "https://github.com/PizzaCrust/sqlcrypto"
 
 # See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
 
