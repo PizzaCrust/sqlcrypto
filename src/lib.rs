@@ -11,8 +11,10 @@ pub use encrypt::*;
 use block_modes::Cbc;
 use aesni::Aes256;
 use block_modes::block_padding::NoPadding;
+use sha1::Sha1;
 
 pub(crate) type Aes = Cbc<Aes256, NoPadding>;
+pub(crate) type Hmac = hmac::Hmac<Sha1>;
 
 #[cfg(test)]
 mod tests {

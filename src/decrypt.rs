@@ -1,21 +1,15 @@
 use crate::*;
 use std::convert::TryInto;
-use ring::pbkdf2::{derive, PBKDF2_HMAC_SHA1};
-use std::num::NonZeroU32;
 use block_modes::BlockMode;
 
 #[inline]
 pub(crate) fn key_derive(salt: &[u8], key: &[u8], hmac: bool) -> (Vec<u8>, Vec<u8>) {
     let mut derived_key = vec![0u8; 32];
-    unsafe {
-        derive(PBKDF2_HMAC_SHA1, NonZeroU32::new_unchecked(64000), salt, key, &mut derived_key[..]);
-    }
+    pbkdf2::pbkdf2::<Hmac>(key, salt, 64000, &mut derived_key);
     let hmac_salt: Vec<u8> = salt.iter().map(|x| x ^ (0x3a)).collect();
     let mut hmac_key = vec![0u8; 32];
     if !hmac {
-        unsafe {
-            derive(PBKDF2_HMAC_SHA1, NonZeroU32::new_unchecked(2), hmac_salt.as_slice(), derived_key.as_slice(), hmac_key.as_mut_slice());
-        }
+        pbkdf2::pbkdf2::<Hmac>(key, hmac_salt.as_slice(), 2, hmac_key.as_mut_slice());
     }
     (derived_key, hmac_key)
 }
