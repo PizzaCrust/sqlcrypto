@@ -22,7 +22,7 @@ fn main() -> sqlcrypto::Result<()> {
         }
         "encrypt" => {
             println!("encrypting");
-            //sqlcrypto::encrypt(victim, password.as_bytes(), &mut result)?;
+            sqlcrypto::encrypt(&mut victim, password.as_bytes())?;
             Ok(())
         }
         _ => {

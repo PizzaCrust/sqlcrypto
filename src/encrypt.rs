@@ -1,7 +1,7 @@
 use crate::*;
 use crate::is_valid_decrypted_header;
-use std::io::Write;
-use ring::hmac::{Key, HMAC_SHA1_FOR_LEGACY_USE_ONLY, sign};
+use hmac::{NewMac, Mac};
+use block_modes::BlockMode;
 
 fn read_db_header(header: &[u8]) -> Result<(usize, usize)> {
     if !(&header[..16] == b"SQLite format 3\0" && is_valid_decrypted_header(&header[16..])) {
@@ -18,30 +18,38 @@ fn read_db_header(header: &[u8]) -> Result<(usize, usize)> {
     Ok((page, reserve))
 }
 
-/// Encrypts a decrypted SQLite database, provided a key and an output stream. THIS IS NOT SECURE!
-pub fn encrypt<R: AsRef<[u8]>, W: Write>(data: R, key: &[u8], output: &mut W) -> Result<()> {
-    //let bytes = data.as_ref();
-    //let (page, reserve) = read_db_header(&bytes[..100])?;
-    //let (key, hmac_key) = key_derive(&[1u8; 16], key, true); // not particularly secure salt
-    //let hmac_key = Key::new(HMAC_SHA1_FOR_LEGACY_USE_ONLY, hmac_key.as_slice());
-    //let mut scheduled_key = vec![0u32; 60];
-    //setkey_enc_k256(key.as_slice(), scheduled_key.as_mut_slice());
-    //output.write(&[1u8; 16])?;
-    //for i in 0..bytes.len()/page {
-    //    let mut page = get_page(bytes, page, i + 1);
-    //    if i == 0 {
-    //        page = &page[16..];
-    //    }
-    //    let page_content = &page[..page.len()-reserve];
-    //    let mut page_encrypted = vec![0u8; page_content.len()];
-    //    cbc_enc(page_content, page_encrypted.as_mut_slice(), scheduled_key.as_slice(), &[1u8; 16]);
-    //    let mut hmac_data: Vec<u8> = page_encrypted.iter().cloned().chain([1u8; 16].iter().cloned()).collect();
-    //    hmac_data.write(&((i + 1) as i32).to_le_bytes())?;
-    //    // TODO SIGN HMAC
-    //    output.write(page_encrypted.as_slice())?;
-    //    output.write(&[1u8; 16])?;
-    //    output.write(sign(&hmac_key, hmac_data.as_slice()).as_ref())?;
-    //    output.write(vec![1u8; reserve - 36].as_slice())?;
-    //} todo finish this
+/// Encrypts a decrypted SQLite database, provided a key. Encrypts in place. THIS IS NOT SECURE!
+pub fn encrypt(bytes: &mut [u8], key: &[u8]) -> Result<()> {
+    let (page, reserve) = read_db_header(&bytes[..100])?;
+    let (key, hmac_key) = key_derive(&[1u8; 16], key, true); // not particularly secure salt
+    for x in 0..16 {
+        bytes[x as usize] = 1;
+    }
+    let len = bytes.len();
+    for i in 0..len/page {
+        let mut page = &mut bytes[page * i..page*(i+1)];
+        if i == 0 {
+            page = &mut page[16..];
+        }
+        let page_content = &mut page[..page.len()-reserve];
+        Aes::new_var(&key[..], &[1u8; 16])?.encrypt(page_content, page_content.len())?;
+        let mut hmac: Hmac = Hmac::new_varkey(hmac_key.as_slice())?;
+        hmac.update(page_content);
+        hmac.update(&[1u8; 16]);
+        hmac.update(&((i + 1) as i32).to_le_bytes());
+        let hmac_bytes = hmac.finalize().into_bytes();
+        let reserve = &mut page[page.len()-reserve..];
+        // iv, hmac data and remaining reserve data
+        let iv = &mut reserve[..16];
+        for x in 0..16 {
+            iv[x as usize] = 1;
+        }
+        let remaining_reserve = &mut reserve[16..];
+        let hmac_len = hmac_bytes.len();
+        println!("{}", hmac_len);
+        hmac_bytes.into_iter().zip(0..hmac_len).for_each(|(byte, index)| {
+            remaining_reserve[index] = byte;
+        });
+    }
     Ok(())
 }
