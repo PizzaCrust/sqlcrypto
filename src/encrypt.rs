@@ -31,25 +31,32 @@ pub fn encrypt(bytes: &mut [u8], key: &[u8]) -> Result<()> {
         if i == 0 {
             page = &mut page[16..];
         }
-        let page_content = &mut page[..page.len()-reserve];
-        Aes::new_var(&key[..], &[1u8; 16])?.encrypt(page_content, page_content.len())?;
+        let page_len = page.len();
+        let page_content = &mut page[..page_len-reserve];
+        Aes::new_var(&key[..], &[1u8; 16])?.encrypt(page_content, 0)?;
         let mut hmac: Hmac = Hmac::new_varkey(hmac_key.as_slice())?;
         hmac.update(page_content);
         hmac.update(&[1u8; 16]);
         hmac.update(&((i + 1) as i32).to_le_bytes());
         let hmac_bytes = hmac.finalize().into_bytes();
-        let reserve = &mut page[page.len()-reserve..];
+        let reserve = &mut page[page_len-reserve..];
         // iv, hmac data and remaining reserve data
         let iv = &mut reserve[..16];
-        for x in 0..16 {
+        for x in 0..16 { // 16
             iv[x as usize] = 1;
         }
-        let remaining_reserve = &mut reserve[16..];
+        let mut remaining_reserve = &mut reserve[16..];
         let hmac_len = hmac_bytes.len();
-        println!("{}", hmac_len);
         hmac_bytes.into_iter().zip(0..hmac_len).for_each(|(byte, index)| {
-            remaining_reserve[index] = byte;
+            remaining_reserve[index] = byte; // 20
         });
+        let reserve_len = reserve.len();
+        remaining_reserve = &mut reserve[16 + (hmac_len-1)..];
+        for x in 0..reserve_len-36 {
+            remaining_reserve[x] = 1;
+        } // 12
+        std::fs::write("page1", page)?;
+        panic!()
     }
     Ok(())
 }
