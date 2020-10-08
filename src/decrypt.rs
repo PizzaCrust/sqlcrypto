@@ -1,55 +1,47 @@
 use crate::*;
-use std::io::{Write};
 use std::convert::TryInto;
 use ring::pbkdf2::{derive, PBKDF2_HMAC_SHA1};
 use std::num::NonZeroU32;
-use ring::hmac::{Key, HMAC_SHA1_FOR_LEGACY_USE_ONLY, verify};
 use block_modes::BlockMode;
 
 #[inline]
-pub(crate) fn key_derive(salt: &[u8], key: &[u8]) -> (Vec<u8>, Vec<u8>) {
+pub(crate) fn key_derive(salt: &[u8], key: &[u8], hmac: bool) -> (Vec<u8>, Vec<u8>) {
     let mut derived_key = vec![0u8; 32];
     unsafe {
         derive(PBKDF2_HMAC_SHA1, NonZeroU32::new_unchecked(64000), salt, key, &mut derived_key[..]);
     }
     let hmac_salt: Vec<u8> = salt.iter().map(|x| x ^ (0x3a)).collect();
     let mut hmac_key = vec![0u8; 32];
-    unsafe {
-        derive(PBKDF2_HMAC_SHA1, NonZeroU32::new_unchecked(2), hmac_salt.as_slice(), derived_key.as_slice(), hmac_key.as_mut_slice());
+    if !hmac {
+        unsafe {
+            derive(PBKDF2_HMAC_SHA1, NonZeroU32::new_unchecked(2), hmac_salt.as_slice(), derived_key.as_slice(), hmac_key.as_mut_slice());
+        }
     }
     (derived_key, hmac_key)
 }
 
-pub(crate) fn verify_hmac(hmac_key: &Key, mut content: Vec<u8>, page_num: usize, hmac_old: &[u8]) -> Result<()> {
-    content.write(&((page_num + 1) as i32).to_le_bytes())?;
-    verify(hmac_key, content.as_slice(), hmac_old)?;
-    Ok(())
-}
-
-/// Decrypts an encrypted SQLite database, provided a key and an output stream.
-pub fn decrypt<R: AsRef<[u8]>, W: Write>(data: R, key: &[u8], output: &mut W) -> Result<()> {
-    let bytes = data.as_ref();
-    output.write(b"SQLite format 3\0")?; // lol
-    let salt = &bytes[..16];
-    let (key, hmac_key) = key_derive(salt, key);
-    let hmac_key = Key::new(HMAC_SHA1_FOR_LEGACY_USE_ONLY, hmac_key.as_slice());
+/// Decrypts an encrypted SQLite database, provided a key. It will decrypt in place.
+pub fn decrypt(data: &mut Vec<u8>, key: &[u8]) -> Result<()> {
+    let salt = &data[..16];
+    let (key, _) = key_derive(salt, key, false);
     let mut page: usize = 1024;
     let mut reserve: usize = 48;
-    reserve = decrypt_page_header(bytes, key.as_slice(), 16, &mut page, 16, reserve)?;
-    for i in 0..bytes.len()/page {
-        let mut page = get_page(bytes, page, i + 1);
+    reserve = decrypt_page_header(&data[..], key.as_slice(), 16, &mut page, 16, reserve)?;
+    b"SQLite format 3\0".into_iter().zip(0..16).for_each(|(byte, index)| {
+        data[index] = *byte;
+    });
+    let len = data.len();
+    for i in 0..len/page {
+        let mut page = &mut data[page * i..page*(i+1)];
         if i == 0 {
-            page = &page[16..];
+            page = &mut page[16..];
         }
-        let page_content = &page[..page.len()-reserve];
-        let reserve = &page[page.len()-reserve..];
-        let iv = &reserve[..16];
-        let hmac_old = &reserve[16..16+20];
-        let hmac_data: Vec<u8> = page_content.iter().cloned().chain(iv.iter().cloned()).collect();
-        #[cfg(not(target_arch = "wasm32"))] verify_hmac(&hmac_key, hmac_data, i, hmac_old)?;
-        let mut page_decrypted = page_content.to_vec();
-        Aes::new_var(&key[..], iv)?.decrypt(page_decrypted.as_mut_slice())?;
-        output.write(&page_decrypted[..])?;
+        let page_len = page.len();
+        let reserve_bytes = &page[page_len-reserve..];
+        let iv = &reserve_bytes[..16];
+        let aes = Aes::new_var(&key[..], iv)?;
+        let page_content = &mut page[..page_len-reserve];
+        aes.decrypt(page_content)?;
     }
     Ok(())
 }

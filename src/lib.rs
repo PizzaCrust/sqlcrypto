@@ -23,7 +23,7 @@ mod tests {
     fn decrypt(b: &mut Bencher) {
         let test = std::fs::read("decrypted-sqlcrypto.db").unwrap(); // 100 ms
         b.iter(|| {
-            super::decrypt(test.as_slice(), b"test", &mut Vec::with_capacity(test.len())).unwrap()
+            super::decrypt(&mut test.clone(), b"test").unwrap()
         });
     }
 

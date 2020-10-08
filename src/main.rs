@@ -1,6 +1,7 @@
 use std::time::Instant;
 use std::fs::File;
 use sqlcrypto::Error;
+use std::io::Write;
 
 fn main() -> sqlcrypto::Result<()> {
     let mut args: Vec<String> = std::env::args().collect();
@@ -9,25 +10,26 @@ fn main() -> sqlcrypto::Result<()> {
         println!("sqlcrypto-cli.exe encrypt/decrypt encrypted.db password decrypted.db");
         return Ok(())
     }
-    let victim = std::fs::read(&args[1])?;
+    let mut victim = std::fs::read(&args[1])?;
     let password = &args[2];
     let mut result = File::create(&args[3])?;
     let instant = Instant::now();
     match &*args[0] {
         "decrypt" => {
             println!("decrypting");
-            sqlcrypto::decrypt(victim, password.as_bytes(), &mut result)?;
+            sqlcrypto::decrypt(&mut victim, password.as_bytes())?;
             Ok(())
         }
         "encrypt" => {
             println!("encrypting");
-            sqlcrypto::encrypt(victim, password.as_bytes(), &mut result)?;
+            //sqlcrypto::encrypt(victim, password.as_bytes(), &mut result)?;
             Ok(())
         }
         _ => {
             Err(Error::Message("Invalid mode"))
         }
     }?;
-    println!("took {} seconds", instant.elapsed().as_secs_f32());
+    println!("took {} milliseconds", instant.elapsed().as_millis());
+    result.write(victim.as_slice())?;
     Ok(())
 }
