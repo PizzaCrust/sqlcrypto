@@ -2,7 +2,7 @@
 name = "sqlcrypto"
 description = "lightweight and memory efficient sqlite/sqlcipher encryption (not secure)/decryption in pure rust"
 license = "MIT"
-version = "0.0.5.1"
+version = "0.1.0"
 authors = ["PizzaCrust <pizzacrustcoder@gmail.com>"]
 edition = "2018"
 repository = "https://github.com/PizzaCrust/sqlcrypto"
