@@ -1,12 +1,12 @@
 use std::time::Instant;
 use std::fs::File;
-use lsqlcrypto::Error;
+use sqlcrypto::Error;
 
-fn main() -> lsqlcrypto::Result<()> {
+fn main() -> sqlcrypto::Result<()> {
     let mut args: Vec<String> = std::env::args().collect();
     args.remove(0);
     if args.len() != 4 {
-        println!("sqlcrypto.exe encrypt/decrypt encrypted.db password decrypted.db");
+        println!("sqlcrypto-cli.exe encrypt/decrypt encrypted.db password decrypted.db");
         return Ok(())
     }
     let victim = std::fs::read(&args[1])?;
@@ -16,12 +16,12 @@ fn main() -> lsqlcrypto::Result<()> {
     match &*args[0] {
         "decrypt" => {
             println!("decrypting");
-            lsqlcrypto::decrypt(victim, password.as_bytes(), &mut result)?;
+            sqlcrypto::decrypt(victim, password.as_bytes(), &mut result)?;
             Ok(())
         }
         "encrypt" => {
             println!("encrypting");
-            lsqlcrypto::encrypt(victim, password.as_bytes(), &mut result)?;
+            sqlcrypto::encrypt(victim, password.as_bytes(), &mut result)?;
             Ok(())
         }
         _ => {
