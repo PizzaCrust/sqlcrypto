@@ -22,11 +22,12 @@ fn read_db_header(header: &[u8]) -> Result<(usize, usize)> {
 }
 
 /// this is not secure! do not use in scenarios that the security of this method is tested!
-pub fn encrypt<W: Write>(bytes: &[u8], key: &[u8], output: &mut W) -> Result<()> {
+pub fn encrypt<R: AsRef<[u8]>, W: Write>(data: R, key: &[u8], output: &mut W) -> Result<()> {
+    let bytes = data.as_ref();
     let (page, reserve) = read_db_header(&bytes[..100])?;
     let (key, hmac_key) = key_derive(&[1u8; 16], key); // not particularly secure salt
     output.write(&[1u8; 16])?;
-    for i in 0..bytes.len()/1024 {
+    for i in 0..bytes.len()/page {
         let mut page = get_page(bytes, page, i + 1);
         if i == 0 {
             page = &page[16..];
