@@ -27,7 +27,8 @@ pub(crate) fn generate_hmac(hmac_key: &[u8], mut content: Vec<u8>, page_num: usi
     Ok(hmac.result())
 }
 
-pub fn decrypt<W: Write>(bytes: &[u8], key: &[u8], output: &mut W) -> Result<()> {
+pub fn decrypt<R: AsRef<[u8]>, W: Write>(data: R, key: &[u8], output: &mut W) -> Result<()> {
+    let bytes = data.as_ref();
     output.write(b"SQLite format 3\0")?; // lol
     let salt = &bytes[..16];
     let (key, hmac_key) = key_derive(salt, key);
