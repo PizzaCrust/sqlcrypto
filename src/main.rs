@@ -1,13 +1,33 @@
 use std::time::Instant;
 use std::fs::File;
+use lsqlcrypto::Error;
 
 fn main() -> lsqlcrypto::Result<()> {
-    let bytes = std::fs::read("encrypted.db").unwrap(); // 115 sec rust crypto hmac check
-    //let mut output: Vec<u8> = Vec::with_capacity(bytes.len());
+    let mut args: Vec<String> = std::env::args().collect();
+    args.remove(0);
+    if args.len() != 4 {
+        println!("sqlcrypto.exe encrypt/decrypt encrypted.db password decrypted.db");
+        return Ok(())
+    }
+    let victim = std::fs::read(&args[1])?;
+    let password = &args[2];
+    let mut result = File::create(&args[3])?;
     let instant = Instant::now();
-    let mut file = File::create("decrypted.db")?;
-    lsqlcrypto::decrypt(bytes, b"9bf9c6ed9d537c399a6c4513e92ab24717e1a488381e3338593abd923fc8a13b", &mut file).unwrap();
-    //lsqlcrypto::encrypt(bytes.as_slice(), b"test", &mut file)?;
-    println!("took {} ms", instant.elapsed().as_millis());
+    match &*args[0] {
+        "decrypt" => {
+            println!("decrypting");
+            lsqlcrypto::decrypt(victim, password.as_bytes(), &mut result)?;
+            Ok(())
+        }
+        "encrypt" => {
+            println!("encrypting");
+            lsqlcrypto::encrypt(victim, password.as_bytes(), &mut result)?;
+            Ok(())
+        }
+        _ => {
+            Err(Error::Message("Invalid mode"))
+        }
+    }?;
+    println!("took {} seconds", instant.elapsed().as_secs_f32());
     Ok(())
 }
