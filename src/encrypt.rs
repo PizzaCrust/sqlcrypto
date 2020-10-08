@@ -1,10 +1,9 @@
 use crate::*;
 use crate::is_valid_decrypted_header;
 use std::io::Write;
-use crypto::aes::cbc_encryptor;
-use crypto::aes::KeySize::KeySize256;
-use crypto::blockmodes::NoPadding;
-use crypto::buffer::{RefReadBuffer, RefWriteBuffer};
+use ring::hmac::{Key, HMAC_SHA1_FOR_LEGACY_USE_ONLY, sign};
+use aes_frast::aes_core::setkey_enc_k256;
+use aes_frast::aes_with_operation_mode::cbc_enc;
 
 fn read_db_header(header: &[u8]) -> Result<(usize, usize)> {
     if !(&header[..16] == b"SQLite format 3\0" && is_valid_decrypted_header(&header[16..])) {
@@ -26,6 +25,9 @@ pub fn encrypt<R: AsRef<[u8]>, W: Write>(data: R, key: &[u8], output: &mut W) ->
     let bytes = data.as_ref();
     let (page, reserve) = read_db_header(&bytes[..100])?;
     let (key, hmac_key) = key_derive(&[1u8; 16], key); // not particularly secure salt
+    let hmac_key = Key::new(HMAC_SHA1_FOR_LEGACY_USE_ONLY, hmac_key.as_slice());
+    let mut scheduled_key = vec![0u32; 60];
+    setkey_enc_k256(key.as_slice(), scheduled_key.as_mut_slice());
     output.write(&[1u8; 16])?;
     for i in 0..bytes.len()/page {
         let mut page = get_page(bytes, page, i + 1);
@@ -34,16 +36,13 @@ pub fn encrypt<R: AsRef<[u8]>, W: Write>(data: R, key: &[u8], output: &mut W) ->
         }
         let page_content = &page[..page.len()-reserve];
         let mut page_encrypted = vec![0u8; page_content.len()];
-        cbc_encryptor(KeySize256, &key[..], &[1u8; 16], NoPadding)
-            .encrypt(&mut RefReadBuffer::new(page_content),
-                     &mut RefWriteBuffer::new(page_encrypted.as_mut_slice()),
-                     true)?;
-        let hmac_data: Vec<u8> = page_encrypted.iter().cloned().chain([1u8; 16].iter().cloned()).collect();
-        //let hmac = verify_hmac(&hmac_key[..], hmac_data, i)?;
+        cbc_enc(page_content, page_encrypted.as_mut_slice(), scheduled_key.as_slice(), &[1u8; 16]);
+        let mut hmac_data: Vec<u8> = page_encrypted.iter().cloned().chain([1u8; 16].iter().cloned()).collect();
+        hmac_data.write(&((i + 1) as i32).to_le_bytes())?;
         // TODO SIGN HMAC
         output.write(page_encrypted.as_slice())?;
         output.write(&[1u8; 16])?;
-        //output.write(hmac.code())?;
+        output.write(sign(&hmac_key, hmac_data.as_slice()).as_ref())?;
         output.write(vec![1u8; reserve - 36].as_slice())?;
     }
     Ok(())

@@ -15,6 +15,5 @@ name = "sqlcrypto"
 path = "src/main.rs"
 
 [dependencies]
-rust-crypto = "0.2.36"
 ring = "0.16.15"
 aes_frast = "0.1.5"
