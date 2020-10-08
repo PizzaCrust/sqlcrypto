@@ -10,8 +10,9 @@ repository = "https://github.com/PizzaCrust/sqlcrypto"
 # See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
 
 [lib]
-name = "sqlcrypto"
+name = "lsqlcrypto"
 path = "src/lib.rs"
+crate-type = ["cdylib", "rlib"]
 
 [[bin]]
 name = "sqlcrypto"
@@ -20,3 +21,6 @@ path = "src/main.rs"
 [dependencies]
 ring = "0.16.15"
 aes_frast = "0.1.5"
+
+[dev-dependencies]
+wasm-bindgen-test = "0.3.18"

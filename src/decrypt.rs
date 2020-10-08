@@ -21,6 +21,7 @@ pub(crate) fn key_derive(salt: &[u8], key: &[u8]) -> (Vec<u8>, Vec<u8>) {
     (derived_key, hmac_key)
 }
 
+#[cfg(not(target_arch = "wasm32"))]
 pub(crate) fn verify_hmac(hmac_key: &Key, mut content: Vec<u8>, page_num: usize, hmac_old: &[u8]) -> Result<()> {
     content.write(&((page_num + 1) as i32).to_le_bytes())?;
     verify(hmac_key, content.as_slice(), hmac_old)?;
@@ -48,7 +49,7 @@ pub fn decrypt<R: AsRef<[u8]>, W: Write>(data: R, key: &[u8], output: &mut W) ->
         let iv = &reserve[..16];
         let hmac_old = &reserve[16..16+20];
         let hmac_data: Vec<u8> = page_content.iter().cloned().chain(iv.iter().cloned()).collect();
-        verify_hmac(&hmac_key, hmac_data, i, hmac_old)?;
+        #[cfg(not(target_arch = "wasm32"))] verify_hmac(&hmac_key, hmac_data, i, hmac_old)?;
         let mut page_decrypted = vec![1u8; page_content.len() + reserve.len()];
         cbc_dec(page_content, page_decrypted.as_mut_slice(), scheduled_keys.as_slice(), iv);
         output.write(&page_decrypted[..])?;
