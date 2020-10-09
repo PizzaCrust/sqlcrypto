@@ -33,7 +33,7 @@ pub fn encrypt(bytes: &mut [u8], key: &[u8]) -> Result<()> {
         }
         let page_len = page.len();
         let page_content = &mut page[..page_len-reserve];
-        Aes::new_var(&key[..], &[1u8; 16])?.encrypt(page_content, 0)?;
+        Aes::new_var(&key[..], &[1u8; 16])?.encrypt(page_content, page_content.len())?;
         let mut hmac: Hmac = Hmac::new_varkey(hmac_key.as_slice())?;
         hmac.update(page_content);
         hmac.update(&[1u8; 16]);
