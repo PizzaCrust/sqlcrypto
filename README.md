@@ -1,8 +1,8 @@
 # SQLCrypto
-SQLCrypto is a port of [pysqlsimplecipher](https://github.com/bssthu/pysqlsimplecipher) for Rust
+SQLCrypto is a pure Rust port of [pysqlsimplecipher](https://github.com/bssthu/pysqlsimplecipher) for Rust
 
 ## Performance
-This library outperforms pysqlsimplecipher by in order of magnitudes, the Dokkan Battle database took up to 300+ seconds on my machine, down to <700 ms in decryption and less than <100 ms in encryption, and consumes significantly less memory.
+This library outperforms pysqlsimplecipher by in order of magnitudes, the Dokkan Battle database took up to 300+ seconds on my machine, down to <700 ms in decryption and less than <1000 ms in encryption, and consumes significantly less memory.
 Other than that, I don't have benchmarks in place.
 
 ## WASM support
