@@ -36,7 +36,7 @@ pub fn decrypt(data: &mut [u8], key: &[u8]) -> Result<()> {
         let page_content = &mut page[..page_len-reserve];
         aes.decrypt(page_content)?;
         Ok(())
-    });
+    })?;
     Ok(())
 }
 
