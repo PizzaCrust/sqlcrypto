@@ -25,7 +25,6 @@ pub fn decrypt(data: &mut [u8], key: &[u8]) -> Result<()> {
     b"SQLite format 3\0".into_iter().zip(0..16).for_each(|(byte, index)| {
         data[index] = *byte;
     });
-    let len = data.len();
     data.par_chunks_mut(page).enumerate().try_for_each::<_, Result<()>>(|(index,mut page)| {
         if index == 0 {
             page = &mut page[16..];
