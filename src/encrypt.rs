@@ -55,8 +55,6 @@ pub fn encrypt(bytes: &mut [u8], key: &[u8]) -> Result<()> {
         for x in 0..reserve_len-36 {
             remaining_reserve[x] = 1;
         } // 12
-        std::fs::write("page1-additions", page);
-        panic!()
     }
     Ok(())
 }
