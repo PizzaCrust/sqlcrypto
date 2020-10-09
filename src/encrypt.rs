@@ -2,6 +2,7 @@ use crate::*;
 use crate::is_valid_decrypted_header;
 use hmac::{NewMac, Mac};
 use block_modes::BlockMode;
+use rayon::prelude::{ParallelSliceMut, IndexedParallelIterator, ParallelIterator};
 
 fn read_db_header(header: &[u8]) -> Result<(usize, usize)> {
     if !(&header[..16] == b"SQLite format 3\0" && is_valid_decrypted_header(&header[16..])) {
@@ -25,9 +26,7 @@ pub fn encrypt(bytes: &mut [u8], key: &[u8]) -> Result<()> {
     for x in 0..16 {
         bytes[x as usize] = 1;
     }
-    let len = bytes.len();
-    for i in 0..len/page {
-        let mut page = &mut bytes[page * i..page*(i+1)];
+    bytes.par_chunks_mut(page).enumerate().try_for_each::<_, Result<()>>(|(i,mut page)|{
         if i == 0 {
             page = &mut page[16..];
         }
@@ -54,7 +53,8 @@ pub fn encrypt(bytes: &mut [u8], key: &[u8]) -> Result<()> {
         remaining_reserve = &mut reserve[16 + hmac_len..];
         for x in 0..reserve_len-36 {
             remaining_reserve[x] = 1;
-        } // 12
-    }
+        }
+        Ok(())
+    })?;
     Ok(())
 }
