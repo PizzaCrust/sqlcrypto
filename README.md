@@ -1,4 +1,7 @@
 # SQLCrypto
+[![Latest Version](https://img.shields.io/crates/v/sqlcrypto.svg)](https://crates.io/crates/sqlcrypto)
+[![Rust Documentation](https://docs.rs/sqlcrypto/badge.svg)](https://docs.rs/sqlcrypto)
+
 SQLCrypto (0.2.0+) is a hardware accelerated port of [pysqlsimplecipher](https://github.com/bssthu/pysqlsimplecipher) for Rust. It is 18x (0.2.1+) faster in decryption and 12.5x (0.2.1+) faster than it's pure Rust implementation.
 
 ## Performance
