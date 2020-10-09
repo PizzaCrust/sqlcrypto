@@ -1,6 +1,7 @@
 use crate::*;
 use std::convert::TryInto;
 use block_modes::BlockMode;
+use rayon::prelude::*;
 
 #[inline]
 pub(crate) fn key_derive(salt: &[u8], key: &[u8], hmac: bool) -> (Vec<u8>, Vec<u8>) {
@@ -25,9 +26,8 @@ pub fn decrypt(data: &mut [u8], key: &[u8]) -> Result<()> {
         data[index] = *byte;
     });
     let len = data.len();
-    for i in 0..len/page {
-        let mut page = &mut data[page * i..page*(i+1)];
-        if i == 0 {
+    data.par_chunks_mut(page).enumerate().try_for_each::<_, Result<()>>(|(index,mut page)| {
+        if index == 0 {
             page = &mut page[16..];
         }
         let page_len = page.len();
@@ -36,7 +36,8 @@ pub fn decrypt(data: &mut [u8], key: &[u8]) -> Result<()> {
         let aes = Aes::new_var(&key[..], iv)?;
         let page_content = &mut page[..page_len-reserve];
         aes.decrypt(page_content)?;
-    }
+        Ok(())
+    });
     Ok(())
 }
 
