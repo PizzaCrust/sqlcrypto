@@ -76,7 +76,7 @@ pub(crate) fn is_valid_decrypted_header(header: &[u8]) -> bool {
 
 #[inline]
 pub(crate) fn get_page_size_from_database_header(header: &[u8]) -> Result<usize> {
-    let page_sz = u16::from_be_bytes(header[16..18].try_into().unwrap());
+    let page_sz = u16::from_be_bytes(header[..2].try_into().unwrap());
     Ok(if page_sz == 1 {
         65536 as usize
     } else {
@@ -86,7 +86,7 @@ pub(crate) fn get_page_size_from_database_header(header: &[u8]) -> Result<usize>
 
 #[inline]
 pub(crate) fn get_reserved_size_from_database_header(header: &[u8]) -> usize {
-    header[20] as usize
+    header[4] as usize
 }
 
 fn try_get_reserve_size_for_specified_page_size(bytes: &[u8], key: &[u8], salt: usize, page: usize, iv: usize, reserve: usize) -> Result<isize> {
@@ -94,10 +94,7 @@ fn try_get_reserve_size_for_specified_page_size(bytes: &[u8], key: &[u8], salt: 
     if reserve >= iv {
         let page_content = decrypt_by_reserve_size(first_page_content, key, iv, reserve)?;
         if is_valid_decrypted_header(page_content.as_slice()) {
-            let mut with_salt = Vec::with_capacity(salt + page_content.len());
-            with_salt.extend_from_slice(&bytes[..salt]);
-            with_salt.extend(page_content);
-            if page == get_page_size_from_database_header(with_salt.as_slice())? && reserve == get_reserved_size_from_database_header(with_salt.as_slice()) {
+            if page == get_page_size_from_database_header(&page_content[..])? && reserve == get_reserved_size_from_database_header(&page_content[..]) {
                 return Ok(reserve as isize)
             }
         }
@@ -105,10 +102,7 @@ fn try_get_reserve_size_for_specified_page_size(bytes: &[u8], key: &[u8], salt: 
     for other_reserve in iv..page - 480 {
         let page_content = decrypt_by_reserve_size(first_page_content, key, iv, other_reserve)?;
         if is_valid_decrypted_header(page_content.as_slice()) {
-            let mut with_salt = Vec::with_capacity(salt + page_content.len());
-            with_salt.extend_from_slice(&bytes[..salt]);
-            with_salt.extend(page_content);
-            if page == get_page_size_from_database_header(with_salt.as_slice())? && other_reserve == get_reserved_size_from_database_header(with_salt.as_slice()) {
+            if page == get_page_size_from_database_header(&page_content[..])? && other_reserve == get_reserved_size_from_database_header(&page_content[..]) {
                 return Ok(other_reserve as isize)
             }
         }

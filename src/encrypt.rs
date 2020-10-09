@@ -7,11 +7,11 @@ fn read_db_header(header: &[u8]) -> Result<(usize, usize)> {
     if !(&header[..16] == b"SQLite format 3\0" && is_valid_decrypted_header(&header[16..])) {
         return Err(Error::Message("invalid db header"))
     }
-    let page = get_page_size_from_database_header(header)?;
+    let page = get_page_size_from_database_header(&header[16..])?;
     if !(is_valid_page_size(page)) {
         return Err(Error::Message("Invalid page size"))
     }
-    let reserve = get_reserved_size_from_database_header(header);
+    let reserve = get_reserved_size_from_database_header(&header[16..]);
     if reserve == 0 {
         return Err(Error::Message("needs reserved space at the end of each page"))
     }
