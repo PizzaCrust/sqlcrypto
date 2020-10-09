@@ -2,15 +2,15 @@
 #![deny(missing_docs)]
 #![feature(test)]
 mod decrypt;
-mod error;
 mod encrypt;
+mod error;
 
-pub use error::*;
-pub use decrypt::*;
-pub use encrypt::*;
-use block_modes::Cbc;
 use aesni::Aes256;
 use block_modes::block_padding::NoPadding;
+use block_modes::Cbc;
+pub use decrypt::*;
+pub use encrypt::*;
+pub use error::*;
 use sha1::Sha1;
 
 pub(crate) type Aes = Cbc<Aes256, NoPadding>;
@@ -24,9 +24,6 @@ mod tests {
     #[bench]
     fn decrypt(b: &mut Bencher) {
         let test = std::fs::read("decrypted-sqlcrypto.db").unwrap(); // 100 ms
-        b.iter(|| {
-            super::decrypt(&mut test.clone(), b"test").unwrap()
-        });
+        b.iter(|| super::decrypt(&mut test.clone(), b"test").unwrap());
     }
-
 }
