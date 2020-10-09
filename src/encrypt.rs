@@ -51,11 +51,11 @@ pub fn encrypt(bytes: &mut [u8], key: &[u8]) -> Result<()> {
             remaining_reserve[index] = byte; // 20
         });
         let reserve_len = reserve.len();
-        remaining_reserve = &mut reserve[16 + (hmac_len-1)..];
+        remaining_reserve = &mut reserve[16 + hmac_len..];
         for x in 0..reserve_len-36 {
             remaining_reserve[x] = 1;
         } // 12
-        std::fs::write("page1", page)?;
+        std::fs::write("page1-additions", page);
         panic!()
     }
     Ok(())

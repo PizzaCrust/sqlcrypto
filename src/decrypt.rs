@@ -8,8 +8,8 @@ pub(crate) fn key_derive(salt: &[u8], key: &[u8], hmac: bool) -> (Vec<u8>, Vec<u
     pbkdf2::pbkdf2::<Hmac>(key, salt, 64000, &mut derived_key);
     let hmac_salt: Vec<u8> = salt.iter().map(|x| x ^ (0x3a)).collect();
     let mut hmac_key = vec![0u8; 32];
-    if !hmac {
-        pbkdf2::pbkdf2::<Hmac>(key, hmac_salt.as_slice(), 2, hmac_key.as_mut_slice());
+    if hmac {
+        pbkdf2::pbkdf2::<Hmac>(derived_key.as_slice(), hmac_salt.as_slice(), 2, hmac_key.as_mut_slice());
     }
     (derived_key, hmac_key)
 }
