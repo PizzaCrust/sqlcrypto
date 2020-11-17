@@ -1,5 +1,7 @@
 use crate::*;
 use block_modes::BlockMode;
+#[cfg(feature = "parallel")]
+use rayon::prelude::*;
 
 #[inline]
 fn decrypt_page((index, mut page): (usize, &mut [u8]), key: &[u8]) -> Result<()> {
@@ -15,11 +17,23 @@ fn decrypt_page((index, mut page): (usize, &mut [u8]), key: &[u8]) -> Result<()>
     Ok(())
 }
 
+#[cfg(not(feature = "parallel"))]
 #[inline]
 fn decrypt_pages(data: &mut [u8], key: &[u8], page: usize) -> Result<()> {
     data.chunks_exact_mut(page)
         .enumerate()
-        .try_for_each::<_, Result<()>>(|x| {
+        .try_for_each(|x| {
+            decrypt_page(x, key)
+        })?;
+    Ok(())
+}
+
+#[cfg(feature = "parallel")]
+#[inline]
+fn decrypt_pages(data: &mut [u8], key: &[u8], page: usize) -> Result<()> {
+    data.par_chunks_exact_mut(page)
+        .enumerate()
+        .try_for_each(|x| {
             decrypt_page(x, key)
         })?;
     Ok(())
