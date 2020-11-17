@@ -33,9 +33,7 @@ fn decrypt_pages(data: &mut [u8], key: &[u8], page: usize) -> Result<()> {
 fn decrypt_pages(data: &mut [u8], key: &[u8], page: usize) -> Result<()> {
     data.par_chunks_exact_mut(page)
         .enumerate()
-        .try_for_each(|x| {
-            decrypt_page(x, key)
-        })?;
+        .try_for_each(|x| decrypt_page(x, key))?;
     Ok(())
 }
 

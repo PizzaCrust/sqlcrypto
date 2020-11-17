@@ -44,20 +44,26 @@ mod tests {
         });
     }
 
-    //#[wasm_bindgen_test]
-    //fn wasm_comp_dec() {
-    //    let test: &[u8] = include_bytes!("../test.db");
-    //    let mut output = Vec::with_capacity(test.len());
-    //    super::decrypt(test, b"test", &mut output).unwrap();
-    //    assert_eq!(output, include_bytes!("../test-dec.db"))
-    //}
+    #[bench]
+    fn encrypt(b: &mut Bencher) {
+        let test = std::fs::read("bomb-dec.db").unwrap();
+        b.iter(|| {
+            super::encrypt(&mut test.clone(), b"test", &[1; 16], &[1; 16]).unwrap()
+        })
+    }
 
-    //#[wasm_bindgen_test]
-    //fn wasm_comp_enc() {
-    //    let test: &[u8] = include_bytes!("../test-dec.db");
-    //    let mut output = Vec::with_capacity(test.len());
-    //    super::encrypt(test, b"test", &mut output).unwrap();
-    //    assert_eq!(output, include_bytes!("../test-enc.db"))
-    //}
+    #[wasm_bindgen_test]
+    fn wasm_comp_dec() {
+        let mut test = include_bytes!("../decrypted-sqlcrypto.db").to_vec();
+        super::decrypt(&mut test[..], b"test", 1024).unwrap();
+        assert_eq!(&test[..], include_bytes!("../bomb-dec.db"))
+    }
+
+    #[wasm_bindgen_test]
+    fn wasm_comp_enc() {
+        let mut test = include_bytes!("../bomb-dec.db").to_vec();
+        super::encrypt(&mut test[..], b"test", &[1; 16], &[1; 16]).unwrap();
+        assert_eq!(&test[..], include_bytes!("../decrypted-sqlcrypto.db"))
+    }
 
 }

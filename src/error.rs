@@ -27,4 +27,5 @@ create_error! {
     std::io::Error => Io
     block_modes::InvalidKeyIvLength => Iv
     block_modes::BlockModeError => BlockMode
+    hmac::crypto_mac::InvalidKeyLength => KeyLength
 }

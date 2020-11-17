@@ -22,8 +22,7 @@ fn main() -> sqlcrypto::Result<()> {
         }
         "encrypt" => {
             println!("encrypting");
-            //sqlcrypto::encrypt(&mut victim, password.as_bytes())?; TODO
-            unimplemented!();
+            sqlcrypto::encrypt(&mut victim, password.as_bytes(), &[1;16], &[1;16])?;
             Ok(())
         }
         _ => Err(Error::Message("Invalid mode")),
