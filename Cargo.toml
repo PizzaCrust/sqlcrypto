@@ -20,8 +20,11 @@ name = "sqlcrypto-cli"
 path = "src/main.rs"
 
 [dependencies]
-ring = "0.16.15"
-aes_frast = "0.1.5"
+block-modes = "0.7.0"
+aes = "0.6.0"
+pbkdf2 = { version = "0.6.0", default-features = false }
+sha-1 = "0.9.2"
+hmac = "0.10.1"
 
 [dev-dependencies]
 wasm-bindgen-test = "0.3.18"
