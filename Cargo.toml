@@ -1,6 +1,6 @@
 [package]
 name = "sqlcrypto"
-description = "lightweight and memory efficient sqlite/sqlcipher encryption (not secure)/decryption in pure rust"
+description = "sqlite encryption/decryption"
 documentation = "https://docs.rs/sqlcrypto"
 license = "MIT"
 version = "1.0.0"
