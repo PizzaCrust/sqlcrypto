@@ -8,6 +8,27 @@ mod encrypt;
 pub use error::*;
 pub use decrypt::*;
 pub use encrypt::*;
+use aes::Aes256;
+use block_modes::block_padding::NoPadding;
+use block_modes::Cbc;
+use sha1::Sha1;
+
+pub(crate) type Aes = Cbc<Aes256, NoPadding>;
+pub(crate) type Hmac = hmac::Hmac<Sha1>;
+
+pub(crate) fn key_derive(key: &[u8], salt: &[u8], hmac: bool) -> ([u8; 32], [u8; 32]) {
+    let mut derived_key = [0u8; 32];
+    pbkdf2::pbkdf2::<Hmac>(key, salt, 64000, &mut derived_key);
+    let mut hmac_salt = [0u8; 16];
+    salt.iter().zip(hmac_salt.iter_mut()).for_each(|(byte, slot)| {
+        *slot = byte ^ 0x3a;
+    });
+    let mut hmac_key = [0u8; 32];
+    if hmac {
+        pbkdf2::pbkdf2::<Hmac>(&derived_key, &hmac_salt, 2, &mut hmac_key);
+    }
+    (derived_key, hmac_key)
+}
 
 #[cfg(test)]
 mod tests {
@@ -15,13 +36,13 @@ mod tests {
     use test::Bencher;
     use wasm_bindgen_test::*;
 
-    //#[bench]
-    //fn decrypt(b: &mut Bencher) {
-    //    let test = std::fs::read("test.db").unwrap(); // 100 ms
-    //    b.iter(|| {
-    //        super::decrypt(test.as_slice(), b"test", &mut Vec::with_capacity(test.len())).unwrap()
-    //    });
-    //}
+    #[bench]
+    fn decrypt(b: &mut Bencher) {
+        let test = std::fs::read("decrypted-sqlcrypto.db").unwrap(); // 100 ms
+        b.iter(|| {
+            super::decrypt(&mut test.clone(), b"test", 1024).unwrap()
+        });
+    }
 
     //#[wasm_bindgen_test]
     //fn wasm_comp_dec() {

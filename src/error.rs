@@ -25,5 +25,6 @@ macro_rules! create_error {
 
 create_error! {
     std::io::Error => Io
-    ring::error::Unspecified => RingUnspecified
+    block_modes::InvalidKeyIvLength => Iv
+    block_modes::BlockModeError => BlockMode
 }
