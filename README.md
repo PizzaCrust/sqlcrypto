@@ -1,12 +1,13 @@
 # SQLCrypto
-SQLCrypto is a pure Rust port of [pysqlsimplecipher](https://github.com/bssthu/pysqlsimplecipher) for Rust
+SQLCrypto is a pure Rust port of [pysqlsimplecipher](https://github.com/bssthu/pysqlsimplecipher), a utility to decrypt and encrypt SQLite databases.
 
 ## Performance
-This library outperforms pysqlsimplecipher by in order of magnitudes, the Dokkan Battle database took up to 300+ seconds on my machine, down to <700 ms in decryption and less than <1000 ms in encryption, and consumes significantly less memory.
-Other than that, I don't have benchmarks in place.
+SQLCrypto, by default, does not parallelize. You can enable parallelization support through enabling the `parallel` feature flag, significantly boosting performance. Additionally, the aes dependency crate allows you to use aesni, if you change some rustc flags; which will boost performance significantly. 
 
-## WASM support
-WASM is supported however, hmac verification is disabled. Additionally, WASM bind gen is not enabled! This means you have to use your own rust crate to interact with this crate to access it with WASM.
+With parallelization + aesni, a database that took an upward amount of 300+ seconds in decryption with pysqlsimplecipher; took <40 ms in decryption and <80 ms in encryption.
 
-## Security
-Please note that this is not production ready, and in its current state; this library has some compromises with regard to security.
+## WASM Support
+Supported without the `parallel` feature flag.
+
+## Additional notes
+Not fuzz safe!
