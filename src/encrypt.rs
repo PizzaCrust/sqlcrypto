@@ -1,49 +1,120 @@
 use crate::*;
-use crate::is_valid_decrypted_header;
-use std::io::Write;
-use ring::hmac::{Key, HMAC_SHA1_FOR_LEGACY_USE_ONLY, sign};
-use aes_frast::aes_core::setkey_enc_k256;
-use aes_frast::aes_with_operation_mode::cbc_enc;
+use std::convert::TryInto;
+use block_modes::BlockMode;
+use hmac::{NewMac, Mac};
+#[cfg(feature = "parallel")]
+use rayon::prelude::*;
 
+#[inline]
+pub(crate) fn is_valid_decrypted_header(header: &[u8]) -> bool {
+    header[5] == 64 && header[6] == 32 && header[7] == 32
+}
+
+#[inline]
+pub(crate) fn get_page_size_from_database_header(header: &[u8]) -> usize {
+    let page_sz = u16::from_be_bytes(header[..2].try_into().unwrap());
+    (if page_sz == 1 {
+        65536 as usize
+    } else {
+        page_sz as usize
+    }) as usize
+}
+
+#[inline]
+pub(crate) fn is_valid_page_size(page: usize) -> bool {
+    page >= 512 && page == 2i32.pow((page as f32).log(2f32).floor() as u32) as usize
+}
+
+#[inline]
+pub(crate) fn get_reserved_size_from_database_header(header: &[u8]) -> usize {
+    header[4] as usize
+}
+
+#[inline]
 fn read_db_header(header: &[u8]) -> Result<(usize, usize)> {
     if !(&header[..16] == b"SQLite format 3\0" && is_valid_decrypted_header(&header[16..])) {
-        return Err(Error::Message("invalid db header"))
+        return Err(Error::Message("Invalid db header"))
     }
-    let page = get_page_size_from_database_header(header)?;
+    let page = get_page_size_from_database_header(&header[16..]);
     if !(is_valid_page_size(page)) {
         return Err(Error::Message("Invalid page size"))
     }
-    let reserve = get_reserved_size_from_database_header(header);
+    let reserve = get_reserved_size_from_database_header(&header[16..]);
     if reserve == 0 {
-        return Err(Error::Message("needs reserved space at the end of each page"))
+        return Err(Error::Message("Needs reserved space at the end of each page"))
     }
     Ok((page, reserve))
 }
 
-/// Encrypts a decrypted SQLite database, provided a key and an output stream. THIS IS NOT SECURE!
-pub fn encrypt<R: AsRef<[u8]>, W: Write>(data: R, key: &[u8], output: &mut W) -> Result<()> {
-    let bytes = data.as_ref();
-    let (page, reserve) = read_db_header(&bytes[..100])?;
-    let (key, hmac_key) = key_derive(&[1u8; 16], key); // not particularly secure salt
-    let hmac_key = Key::new(HMAC_SHA1_FOR_LEGACY_USE_ONLY, hmac_key.as_slice());
-    let mut scheduled_key = vec![0u32; 60];
-    setkey_enc_k256(key.as_slice(), scheduled_key.as_mut_slice());
-    output.write(&[1u8; 16])?;
-    for i in 0..bytes.len()/page {
-        let mut page = get_page(bytes, page, i + 1);
-        if i == 0 {
-            page = &page[16..];
-        }
-        let page_content = &page[..page.len()-reserve];
-        let mut page_encrypted = vec![0u8; page_content.len()];
-        cbc_enc(page_content, page_encrypted.as_mut_slice(), scheduled_key.as_slice(), &[1u8; 16]);
-        let mut hmac_data: Vec<u8> = page_encrypted.iter().cloned().chain([1u8; 16].iter().cloned()).collect();
-        hmac_data.write(&((i + 1) as i32).to_le_bytes())?;
-        // TODO SIGN HMAC
-        output.write(page_encrypted.as_slice())?;
-        output.write(&[1u8; 16])?;
-        output.write(sign(&hmac_key, hmac_data.as_slice()).as_ref())?;
-        output.write(vec![1u8; reserve - 36].as_slice())?;
+#[inline]
+fn encrypt_page((index, mut page): (usize, &mut [u8]),
+                key: &[u8],
+                iv: &[u8],
+                hmac_key: &[u8],
+                reserve: usize) -> Result<()> {
+    if index == 0 {
+        page = &mut page[16..];
     }
+    let page_len = page.len();
+    let page_content = &mut page[..page_len - reserve];
+    Aes::new_var(key, iv)?.encrypt(page_content, page_content.len())?;
+    let mut hmac: Hmac = Hmac::new_varkey(hmac_key)?;
+    hmac.update(page_content);
+    hmac.update(iv);
+    hmac.update(&((index + 1) as i32).to_le_bytes());
+    let hmac_bytes = hmac.finalize().into_bytes();
+    let reserve_slice = &mut page[page_len - reserve..];
+    let iv_slice =  &mut reserve_slice[..16];
+    iv.iter().zip(iv_slice.iter_mut()).for_each(|(byte, slot)| {
+        *slot = *byte;
+    });
+    let reserve_slice = &mut reserve_slice[16..];
+    let hmac_len = hmac_bytes.len();
+    hmac_bytes.into_iter().zip(reserve_slice.iter_mut()).for_each(|(byte, slot)| {
+         *slot = byte;
+    });
+    let reserve_slice = &mut reserve_slice[hmac_len..];
+    for x in 0..reserve - (hmac_len + 16) {
+        reserve_slice[x] = 1;
+    }
+    Ok(())
+}
+
+#[cfg(not(feature = "parallel"))]
+#[inline]
+fn encrypt_pages(bytes: &mut [u8],
+                 key: &[u8],
+                 iv: &[u8],
+                 hmac_key: &[u8],
+                 page: usize,
+                 reserve: usize) -> Result<()> {
+    bytes.chunks_exact_mut(page)
+        .enumerate()
+        .try_for_each(|x| encrypt_page(x, key, iv, hmac_key, reserve))?;
+    Ok(())
+}
+
+#[cfg(feature = "parallel")]
+fn encrypt_pages(bytes: &mut [u8],
+                 key: &[u8],
+                 iv: &[u8],
+                 hmac_key: &[u8],
+                 page: usize,
+                 reserve: usize) -> Result<()> {
+    bytes.par_chunks_exact_mut(page)
+        .enumerate()
+        .try_for_each(|x| encrypt_page(x, key, iv, hmac_key, reserve))?;
+    Ok(())
+}
+
+/// Encrypts a decrypted SQLite database in place.
+/// This will use the database's configured page size and reserve size. Most databases use the default of 1024 and 48 for the page size and reserve size respectively.
+pub fn encrypt(bytes: &mut [u8], key: &[u8], salt: &[u8; 16], iv: &[u8; 16]) -> Result<()> {
+    let (page, reserve) = read_db_header(&bytes[..100])?;
+    let (key, hmac_key) = key_derive(key, salt, true);
+    salt.iter().zip(bytes.iter_mut()).for_each(|(byte, slot)| {
+        *slot = *byte;
+    });
+    encrypt_pages(bytes, &key, iv, &hmac_key, page, reserve)?;
     Ok(())
 }
