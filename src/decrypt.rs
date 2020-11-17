@@ -42,9 +42,7 @@ fn decrypt_pages(data: &mut [u8], key: &[u8], page: usize) -> Result<()> {
 pub fn decrypt(data: &mut [u8], key: &[u8], page: usize) -> Result<()> {
     let salt = &data[..16];
     let (key, _) = key_derive(key, salt, false);
-    b"SQLite format 3\0".iter().zip(data.iter_mut()).for_each(|(byte, slot)| {
-        *slot = *byte;
-    });
+    data[..16].copy_from_slice(b"SQLite format 3\0");
     decrypt_pages(data, &key, page)?;
     Ok(())
 }

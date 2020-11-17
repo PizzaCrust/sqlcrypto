@@ -32,4 +32,6 @@ create_error! {
     block_modes::BlockModeError => BlockMode
     /// Key length error
     hmac::crypto_mac::InvalidKeyLength => KeyLength
+    /// Random num generation error
+    getrandom::Error => Random
 }

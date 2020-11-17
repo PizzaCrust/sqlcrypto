@@ -2,6 +2,7 @@ use crate::*;
 use std::convert::TryInto;
 use block_modes::BlockMode;
 use hmac::{NewMac, Mac};
+use getrandom::getrandom;
 #[cfg(feature = "parallel")]
 use rayon::prelude::*;
 
@@ -49,7 +50,6 @@ fn read_db_header(header: &[u8]) -> Result<(usize, usize)> {
 #[inline]
 fn encrypt_page((index, mut page): (usize, &mut [u8]),
                 key: &[u8],
-                iv: &[u8],
                 hmac_key: &[u8],
                 reserve: usize) -> Result<()> {
     if index == 0 {
@@ -57,26 +57,24 @@ fn encrypt_page((index, mut page): (usize, &mut [u8]),
     }
     let page_len = page.len();
     let page_content = &mut page[..page_len - reserve];
-    Aes::new_var(key, iv)?.encrypt(page_content, page_content.len())?;
+    let mut iv = [0u8; 16];
+    getrandom(&mut iv)?;
+    Aes::new_var(key, &iv)?.encrypt(page_content, page_content.len())?;
     let mut hmac: Hmac = Hmac::new_varkey(hmac_key)?;
     hmac.update(page_content);
-    hmac.update(iv);
+    hmac.update(&iv);
     hmac.update(&((index + 1) as i32).to_le_bytes());
     let hmac_bytes = hmac.finalize().into_bytes();
     let reserve_slice = &mut page[page_len - reserve..];
     let iv_slice =  &mut reserve_slice[..16];
-    iv.iter().zip(iv_slice.iter_mut()).for_each(|(byte, slot)| {
-        *slot = *byte;
-    });
+    iv_slice.copy_from_slice(&iv);
     let reserve_slice = &mut reserve_slice[16..];
     let hmac_len = hmac_bytes.len();
-    hmac_bytes.into_iter().zip(reserve_slice.iter_mut()).for_each(|(byte, slot)| {
-         *slot = byte;
-    });
+    reserve_slice[..hmac_len].copy_from_slice(hmac_bytes.as_slice());
     let reserve_slice = &mut reserve_slice[hmac_len..];
-    for x in 0..reserve - (hmac_len + 16) {
-        reserve_slice[x] = 1;
-    }
+    let mut noise = [0u8; 12];
+    getrandom(&mut noise)?;
+    reserve_slice.copy_from_slice(&noise);
     Ok(())
 }
 
@@ -84,37 +82,35 @@ fn encrypt_page((index, mut page): (usize, &mut [u8]),
 #[inline]
 fn encrypt_pages(bytes: &mut [u8],
                  key: &[u8],
-                 iv: &[u8],
                  hmac_key: &[u8],
                  page: usize,
                  reserve: usize) -> Result<()> {
     bytes.chunks_exact_mut(page)
         .enumerate()
-        .try_for_each(|x| encrypt_page(x, key, iv, hmac_key, reserve))?;
+        .try_for_each(|x| encrypt_page(x, key, hmac_key, reserve))?;
     Ok(())
 }
 
 #[cfg(feature = "parallel")]
 fn encrypt_pages(bytes: &mut [u8],
                  key: &[u8],
-                 iv: &[u8],
                  hmac_key: &[u8],
                  page: usize,
                  reserve: usize) -> Result<()> {
     bytes.par_chunks_exact_mut(page)
         .enumerate()
-        .try_for_each(|x| encrypt_page(x, key, iv, hmac_key, reserve))?;
+        .try_for_each(|x| encrypt_page(x, key, hmac_key, reserve))?;
     Ok(())
 }
 
 /// Encrypts a decrypted SQLite database in place.
 /// This will use the database's configured page size and reserve size. Most databases use the default of 1024 and 48 for the page size and reserve size respectively.
-pub fn encrypt(bytes: &mut [u8], key: &[u8], salt: &[u8; 16], iv: &[u8; 16]) -> Result<()> {
+pub fn encrypt(bytes: &mut [u8], key: &[u8]) -> Result<()> {
     let (page, reserve) = read_db_header(&bytes[..100])?;
-    let (key, hmac_key) = key_derive(key, salt, true);
-    salt.iter().zip(bytes.iter_mut()).for_each(|(byte, slot)| {
-        *slot = *byte;
-    });
-    encrypt_pages(bytes, &key, iv, &hmac_key, page, reserve)?;
+    let mut salt = [0u8; 16];
+    getrandom(&mut salt)?;
+    bytes[..16].copy_from_slice(&salt);
+    let (key, hmac_key) = key_derive(key, &salt, true);
+    encrypt_pages(bytes, &key, &hmac_key, page, reserve)?;
     Ok(())
 }

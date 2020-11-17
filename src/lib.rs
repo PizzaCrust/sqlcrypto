@@ -48,7 +48,7 @@ mod tests {
     fn encrypt(b: &mut Bencher) {
         let test = std::fs::read("bomb-dec.db").unwrap();
         b.iter(|| {
-            super::encrypt(&mut test.clone(), b"test", &[1; 16], &[1; 16]).unwrap()
+            super::encrypt(&mut test.clone(), b"test").unwrap()
         })
     }
 
@@ -62,8 +62,9 @@ mod tests {
     #[wasm_bindgen_test]
     fn wasm_comp_enc() {
         let mut test = include_bytes!("../bomb-dec.db").to_vec();
-        super::encrypt(&mut test[..], b"test", &[1; 16], &[1; 16]).unwrap();
-        assert_eq!(&test[..], include_bytes!("../decrypted-sqlcrypto.db"))
+        super::encrypt(&mut test[..], b"test").unwrap();
+        //assert_eq!(&test[..], include_bytes!("../decrypted-sqlcrypto.db"))
+        // can't compare anymore since we generate random ivs and noise
     }
 
 }
