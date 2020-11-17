@@ -24,8 +24,12 @@ macro_rules! create_error {
 }
 
 create_error! {
+    /// Io error
     std::io::Error => Io
+    /// Iv error
     block_modes::InvalidKeyIvLength => Iv
+    /// Block mode error
     block_modes::BlockModeError => BlockMode
+    /// Key length error
     hmac::crypto_mac::InvalidKeyLength => KeyLength
 }

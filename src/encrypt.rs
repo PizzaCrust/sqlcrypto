@@ -107,7 +107,8 @@ fn encrypt_pages(bytes: &mut [u8],
     Ok(())
 }
 
-/// Encrypts a decrypted SQLite database in place. This will use the database's set page size and reserve size.
+/// Encrypts a decrypted SQLite database in place.
+/// This will use the database's configured page size and reserve size. Most databases use the default of 1024 and 48 for the page size and reserve size respectively.
 pub fn encrypt(bytes: &mut [u8], key: &[u8], salt: &[u8; 16], iv: &[u8; 16]) -> Result<()> {
     let (page, reserve) = read_db_header(&bytes[..100])?;
     let (key, hmac_key) = key_derive(key, salt, true);
