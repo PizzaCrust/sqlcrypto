@@ -1,4 +1,7 @@
 # SQLCrypto
+[![Latest Version](https://img.shields.io/crates/v/sqlcrypto.svg)](https://crates.io/crates/sqlcrypto)
+[![Rust Documentation](https://docs.rs/sqlcrypto/badge.svg)](https://docs.rs/sqlcrypto)
+
 SQLCrypto is a pure Rust port of [pysqlsimplecipher](https://github.com/bssthu/pysqlsimplecipher), a utility to decrypt and encrypt SQLite databases.
 
 ## Performance
