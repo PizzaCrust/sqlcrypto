@@ -2,6 +2,8 @@ use crate::*;
 use std::convert::TryInto;
 use block_modes::BlockMode;
 use hmac::{NewMac, Mac};
+#[cfg(feature = "parallel")]
+use rayon::prelude::*;
 
 #[inline]
 pub(crate) fn is_valid_decrypted_header(header: &[u8]) -> bool {
@@ -46,10 +48,10 @@ fn read_db_header(header: &[u8]) -> Result<(usize, usize)> {
 
 #[inline]
 fn encrypt_page((index, mut page): (usize, &mut [u8]),
-                    key: &[u8],
-                    iv: &[u8],
-                    hmac_key: &[u8],
-                    reserve: usize) -> Result<()> {
+                key: &[u8],
+                iv: &[u8],
+                hmac_key: &[u8],
+                reserve: usize) -> Result<()> {
     if index == 0 {
         page = &mut page[16..];
     }
@@ -78,14 +80,28 @@ fn encrypt_page((index, mut page): (usize, &mut [u8]),
     Ok(())
 }
 
+#[cfg(not(feature = "parallel"))]
 #[inline]
 fn encrypt_pages(bytes: &mut [u8],
-                     key: &[u8],
-                     iv: &[u8],
-                     hmac_key: &[u8],
-                     page: usize,
-                     reserve: usize) -> Result<()> {
+                 key: &[u8],
+                 iv: &[u8],
+                 hmac_key: &[u8],
+                 page: usize,
+                 reserve: usize) -> Result<()> {
     bytes.chunks_exact_mut(page)
+        .enumerate()
+        .try_for_each(|x| encrypt_page(x, key, iv, hmac_key, reserve))?;
+    Ok(())
+}
+
+#[cfg(feature = "parallel")]
+fn encrypt_pages(bytes: &mut [u8],
+                 key: &[u8],
+                 iv: &[u8],
+                 hmac_key: &[u8],
+                 page: usize,
+                 reserve: usize) -> Result<()> {
+    bytes.par_chunks_exact_mut(page)
         .enumerate()
         .try_for_each(|x| encrypt_page(x, key, iv, hmac_key, reserve))?;
     Ok(())
