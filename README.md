@@ -10,7 +10,7 @@ SQLCrypto, by default, does not parallelize. You can enable parallelization supp
 With parallelization + aesni, a database that took an upward amount of 300+ seconds in decryption with pysqlsimplecipher; took <40 ms in decryption and <80 ms in encryption.
 
 ## WASM Support
-Supported without the `parallel` feature flag.
+The `js` feature flag is required for WASM support. Additionally, the `parallel` feature flag is not supported on WASM targets.
 
 ## Additional notes
 Not fuzz safe!
