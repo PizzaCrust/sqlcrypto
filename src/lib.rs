@@ -34,37 +34,38 @@ pub(crate) fn key_derive(key: &[u8], salt: &[u8], hmac: bool) -> ([u8; 32], [u8;
 mod tests {
     extern crate test;
     use test::Bencher;
+    #[cfg(target_arch = "wasm32")]
     use wasm_bindgen_test::*;
 
     #[bench]
-    fn decrypt(b: &mut Bencher) {
-        let test = std::fs::read("decrypted-sqlcrypto.db").unwrap(); // 100 ms
+    fn decrypt_bench(b: &mut Bencher) {
+        let test = std::fs::read("sqlcrypto.db").unwrap();
         b.iter(|| {
             super::decrypt(&mut test.clone(), b"test", 1024).unwrap()
         });
     }
 
     #[bench]
-    fn encrypt(b: &mut Bencher) {
-        let test = std::fs::read("bomb-dec.db").unwrap();
+    fn encrypt_bench(b: &mut Bencher) {
+        let test = std::fs::read("sqlcrypto_dec.db").unwrap();
         b.iter(|| {
             super::encrypt(&mut test.clone(), b"test").unwrap()
         })
     }
 
-    #[wasm_bindgen_test]
-    fn wasm_comp_dec() {
-        let mut test = include_bytes!("../decrypted-sqlcrypto.db").to_vec();
+    #[test]
+    #[cfg_attr(target_arch = "wasm32", wasm_bindgen_test)]
+    fn comp_dec() {
+        let mut test = include_bytes!("../sqlcrypto.db").to_vec();
         super::decrypt(&mut test[..], b"test", 1024).unwrap();
-        assert_eq!(&test[..], include_bytes!("../bomb-dec.db"))
+        assert!(&test[..] == include_bytes!("../sqlcrypto_dec.db"))
     }
 
-    #[wasm_bindgen_test]
-    fn wasm_comp_enc() {
-        let mut test = include_bytes!("../bomb-dec.db").to_vec();
+    #[test]
+    #[cfg_attr(target_arch = "wasm32", wasm_bindgen_test)]
+    fn comp_enc() {
+        let mut test = include_bytes!("../sqlcrypto_dec.db").to_vec();
         super::encrypt(&mut test[..], b"test").unwrap();
-        //assert_eq!(&test[..], include_bytes!("../decrypted-sqlcrypto.db"))
-        // can't compare anymore since we generate random ivs and noise
     }
 
 }

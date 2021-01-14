@@ -7,3 +7,5 @@ Cargo.lock
 !/.gitignore
 *.patch
 *.db
+!sqlcrypto.db
+!sqlcrypto_dec.db
