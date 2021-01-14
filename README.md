@@ -5,8 +5,8 @@
 SQLCrypto is a pure Rust port of [pysqlsimplecipher](https://github.com/bssthu/pysqlsimplecipher), a utility to decrypt and encrypt SQLite databases.
 
 ## ⚠ Incomplete encryption implementation ️⚠️
-Encryption works for databases that have reserves, however databases without them; cannot be encrypted.
-Support for them will be added soon, however they will be more expensive to encrypt.
+Encryption works for databases that have reserves, however databases without them cannot be encrypted with this library at this stage.
+Support for them will eventually come at the cost of performance.
 
 ## Performance
 SQLCrypto, by default, does not parallelize. You can enable parallelization support through enabling the `parallel` feature flag, significantly boosting performance. Additionally, the aes dependency crate allows you to use aesni, if you change some rustc flags; which will boost performance significantly. 
