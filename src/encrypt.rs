@@ -31,19 +31,18 @@ pub(crate) fn get_reserved_size_from_database_header(header: &[u8]) -> usize {
     header[4] as usize
 }
 
+/// Reads a database's header for the page size and reserve size.
+/// Will error if it's an invalid header or a invalid page size.
 #[inline]
-fn read_db_header(header: &[u8]) -> Result<(usize, usize)> {
+pub fn read_db_header(header: &[u8]) -> Result<(usize, usize)> {
     if !(&header[..16] == b"SQLite format 3\0" && is_valid_decrypted_header(&header[16..])) {
-        return Err(Error::Message("Invalid db header"))
+        return Err(Error::Header)
     }
     let page = get_page_size_from_database_header(&header[16..]);
     if !(is_valid_page_size(page)) {
-        return Err(Error::Message("Invalid page size"))
+        return Err(Error::PageSize)
     }
     let reserve = get_reserved_size_from_database_header(&header[16..]);
-    if reserve == 0 {
-        return Err(Error::Message("Needs reserved space at the end of each page"))
-    }
     Ok((page, reserve))
 }
 
@@ -104,9 +103,13 @@ fn encrypt_pages(bytes: &mut [u8],
 }
 
 /// Encrypts a decrypted SQLite database in place.
-/// This will use the database's configured page size and reserve size. Most databases use the default of 1024 and 48 for the page size and reserve size respectively.
-pub fn encrypt(bytes: &mut [u8], key: &[u8]) -> Result<()> {
-    let (page, reserve) = read_db_header(&bytes[..100])?;
+/// It incurs no allocations and can be parallelized, however the database must have a reserve.
+pub fn encrypt(bytes: &mut [u8],
+               key: &[u8],
+               (page, reserve): (usize, usize)) -> Result<()> {
+    if reserve == 0 {
+        return Err(Error::Reserve);
+    }
     let mut salt = [0u8; 16];
     getrandom(&mut salt)?;
     bytes[..16].copy_from_slice(&salt);
