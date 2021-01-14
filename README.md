@@ -6,7 +6,7 @@ SQLCrypto is a pure Rust port of [pysqlsimplecipher](https://github.com/bssthu/p
 
 ## ⚠ Incomplete encryption implementation ️⚠️
 Encryption works for databases that have reserves, however databases without them; cannot be encrypted.
-Support for them will be added soon, however they will have penalties to performance compared to encrypting databases with reserves.
+Support for them will be added soon, however they will be more expensive to encrypt.
 
 ## Performance
 SQLCrypto, by default, does not parallelize. You can enable parallelization support through enabling the `parallel` feature flag, significantly boosting performance. Additionally, the aes dependency crate allows you to use aesni, if you change some rustc flags; which will boost performance significantly. 
